@@ -1,12 +1,13 @@
 [package]
 name = "graylog-to-grafana"
 description = "This tool can convert Graylog dashboards into Grafana dashboards."
-version = "0.1.0"
+version = "0.1.1"
 authors = ["jan.jansen <jan.jansen@gdata.de>"]
 edition = "2018"
 license = "MIT"
 keywords = ["graylog", "grafana"]
 repository = "https://github.com/GDATASoftwareAG/graylog-to-grafana"
+readme = "README.md"
 
 [badges]
 travis-ci = { repository = "GDATASoftwareAG/graylog-to-grafana" }

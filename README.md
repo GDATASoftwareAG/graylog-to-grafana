@@ -1,6 +1,9 @@
-# Graylog to Grafana
+# Graylog to Grafana &emsp; [![Build Status]][travis] [![Latest Version]][crates.io]
 
-[![Build Status](https://travis-ci.org/GDATASoftwareAG/graylog-to-grafana.svg?branch=master)](https://travis-ci.org/GDATASoftwareAG/graylog-to-grafana)
+[Build Status]: https://travis-ci.org/GDATASoftwareAG/graylog-to-grafana.svg?branch=master
+[travis]: https://travis-ci.org/GDATASoftwareAG/graylog-to-grafana
+[Latest Version]: https://img.shields.io/crates/v/graylog-to-grafana.svg
+[crates.io]: https://crates.io/crates/graylog-to-grafana
 
 This tool can convert Graylog dashboards into Grafana dashboards.
 
