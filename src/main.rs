@@ -49,6 +49,10 @@ pub struct ApplicationArguments {
     #[structopt(long = "datasource", default_value = "graylog")]
     datasource: String,
 
+    /// Graylog url
+    #[structopt(long = "graylog-url")]
+    graylog_url: String,
+
     #[structopt(subcommand)]
     command: Command,
 }

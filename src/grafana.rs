@@ -1,6 +1,7 @@
 use crate::{graylog, ApplicationArguments};
 use log::warn;
 use serde::{Deserialize, Serialize};
+use url::form_urlencoded;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Dashboard {
@@ -54,9 +55,38 @@ pub enum PanelType {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Link {
+    title: String,
+    r#type: String,
+    url: String,
+    #[serde(rename = "targetBlank")]
+    target_blank: bool,
+}
+
+impl Link {
+    fn new(url: &str, query: &str, seconds: i64) -> Link {
+        let encoded: String = form_urlencoded::Serializer::new(String::new())
+            .append_pair("rangetype", "relative")
+            .append_pair("fields", "message,source")
+            .append_pair("width", "1920")
+            .append_pair("highlightMessage", "")
+            .append_pair("relative", &seconds.to_string())
+            .append_pair("q", query)
+            .finish();
+        Link {
+            title: "Go to Graylog".to_string(),
+            r#type: "absolute".to_string(),
+            url: format!("{}/search?{}", url, encoded),
+            target_blank: true,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Panel {
     r#type: PanelType,
     title: String,
+    links: Vec<Link>,
     datasource: String,
     targets: Vec<PanelTarget>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -98,6 +128,33 @@ impl Panel {
             grid_pos,
             value_name: None,
             time_from: None,
+            links: vec![],
+        }
+    }
+
+    fn new(
+        title: String,
+        r#type: PanelType,
+        query: &str,
+        sparkline: Option<Sparkline>,
+        targets: Vec<PanelTarget>,
+        grid_pos: GridPos,
+        range: i64,
+        opt: &ApplicationArguments,
+    ) -> Panel {
+        Panel {
+            title,
+            r#type,
+            value_name: Some("total".to_string()),
+            datasource: opt.datasource.clone(),
+            targets,
+            bars: None,
+            lines: None,
+            points: None,
+            sparkline,
+            grid_pos,
+            time_from: Some(format!("{}h", range / 3600)),
+            links: vec![Link::new(&opt.graylog_url, query, range)],
         }
     }
 
@@ -113,7 +170,7 @@ impl Panel {
                 Panel::new_graph(
                     widget.description,
                     vec![PanelTarget::new(
-                        configuration.query.unwrap(),
+                        &configuration.query.unwrap(),
                         configuration.interval.unwrap().grafana(),
                         "A",
                         configuration.field.unwrap(),
@@ -135,7 +192,7 @@ impl Panel {
                         .iter()
                         .map(|s| {
                             PanelTarget::new(
-                                s.query.clone(),
+                                &s.query,
                                 interval.to_string(),
                                 "A",
                                 s.field.clone(),
@@ -150,32 +207,30 @@ impl Panel {
             }
             graylog::DashboardWidgetType::SearchResultCount => {
                 let configuration = widget.configuration;
-                Panel {
-                    title: widget.description,
-                    r#type: PanelType::SingleStat,
-                    value_name: Some("total".to_string()),
-                    datasource: opt.datasource.clone(),
-                    targets: vec![PanelTarget::new(
-                        configuration.query.unwrap(),
+                let query = &configuration.query.unwrap();
+                Panel::new(
+                    widget.description,
+                    PanelType::SingleStat,
+                    query,
+                    Some(Sparkline::new(configuration.trend.unwrap())),
+                    vec![PanelTarget::new(
+                        query,
                         "1m",
                         "A",
                         "select field".to_string(),
                         "count".to_string(),
                     )],
-                    bars: None,
-                    lines: None,
-                    points: None,
-                    sparkline: Some(Sparkline::new(configuration.trend.unwrap())),
                     grid_pos,
-                    time_from: Some(format!("{}h", configuration.timerange.range / 3600)),
-                }
+                    configuration.timerange.range,
+                    opt,
+                )
             }
             graylog::DashboardWidgetType::SearchResultChart => {
                 let configuration = widget.configuration;
                 Panel::new_graph(
                     widget.description,
                     vec![PanelTarget::new(
-                        configuration.query.unwrap(),
+                        &configuration.query.unwrap(),
                         configuration.interval.unwrap().grafana(),
                         "A",
                         "select field".to_string(),
@@ -188,19 +243,22 @@ impl Panel {
             }
             graylog::DashboardWidgetType::QuickValues => {
                 let configuration = widget.configuration;
-                Panel {
-                    title: widget.description,
-                    r#type: PanelType::PieChart,
-                    value_name: Some("total".to_string()),
-                    datasource: opt.datasource.clone(),
-                    targets: vec![PanelTarget::new_buckets(configuration)],
-                    bars: None,
-                    lines: None,
-                    points: None,
-                    sparkline: None,
+                let query = &configuration.query.unwrap();
+                Panel::new(
+                    widget.description,
+                    PanelType::PieChart,
+                    query,
+                    None,
+                    vec![PanelTarget::new_buckets(
+                        query,
+                        &configuration.field.unwrap(),
+                        configuration.sort_order,
+                        configuration.limit,
+                    )],
                     grid_pos,
-                    time_from: None,
-                }
+                    configuration.timerange.range,
+                    opt,
+                )
             }
             graylog::DashboardWidgetType::QuickValuesHistogram => {
                 warn!(
@@ -274,7 +332,7 @@ pub struct PanelTarget {
 
 impl PanelTarget {
     fn new<T1, T2>(
-        query: String,
+        query: &str,
         interval: T1,
         ref_id: T2,
         field: String,
@@ -302,7 +360,12 @@ impl PanelTarget {
         }
     }
 
-    fn new_buckets(config: graylog::DashboardWidgetConfiguration) -> PanelTarget {
+    fn new_buckets(
+        query: &str,
+        field: &str,
+        sort_order: Option<String>,
+        limit: Option<i64>,
+    ) -> PanelTarget {
         PanelTarget {
             ref_id: "A".to_string(),
             metrics: vec![PanelTargetMetric {
@@ -312,14 +375,14 @@ impl PanelTarget {
             }],
             bucket_aggs: vec![
                 PanelBucketAgg::new_terms(
-                    config.field.unwrap().clone(),
-                    config.sort_order.or_else(|| Some("desc".to_string())),
-                    config.limit.unwrap_or(5),
+                    field,
+                    sort_order.or_else(|| Some("desc".to_string())),
+                    limit.unwrap_or(5),
                 ),
                 PanelBucketAgg::new_date_histogram("1h".to_string(), true),
             ],
             time_field: "timestamp".to_string(),
-            query: config.query.unwrap().to_string(),
+            query: query.to_string(),
             alias: None,
         }
     }
@@ -362,10 +425,10 @@ impl PanelBucketAgg {
             fake: fake.into(),
         }
     }
-    fn new_terms(field: String, order: Option<String>, limit: i64) -> PanelBucketAgg {
+    fn new_terms(field: &str, order: Option<String>, limit: i64) -> PanelBucketAgg {
         PanelBucketAgg {
             r#type: "terms".to_string(),
-            field,
+            field: field.to_string(),
             id: "1".to_string(),
             settings: PanelBucketAggSettings {
                 interval: None,
@@ -375,7 +438,7 @@ impl PanelBucketAgg {
                 trim_edges: 0,
                 order_by: Some("_term".to_string()),
             },
-            fake: true.into(),
+            fake: Some(true),
         }
     }
 }
@@ -393,4 +456,24 @@ pub struct PanelBucketAggSettings {
     trim_edges: i64,
     #[serde(rename = "orderBy", skip_serializing_if = "Option::is_none")]
     order_by: Option<String>,
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn panel_bucket_agg_new_date_histogram_with_fake_interval() {
+        let bucket = PanelBucketAgg::new_date_histogram("".to_string(), true);
+
+        assert_eq!(Some(true), bucket.fake);
+        assert_eq!(Some("".to_string()), bucket.settings.interval);
+    }
+
+    #[test]
+    fn panel_bucket_agg_new_date_histogram_without_fake_interval() {
+        let bucket = PanelBucketAgg::new_date_histogram(None, None);
+
+        assert_eq!(None, bucket.fake);
+        assert_eq!(None, bucket.settings.interval);
+    }
 }

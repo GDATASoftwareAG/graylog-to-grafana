@@ -8,19 +8,20 @@
 This tool can convert Graylog dashboards into Grafana dashboards.
 
 ```
-graylog-to-grafana 0.1.1
+graylog-to-grafana 0.2.1
 jan.jansen <jan.jansen@gdata.de>
 This tool can convert Graylog dashboards into Grafana dashboards.
 
 USAGE:
-    graylog-to-grafana [OPTIONS] <input> <SUBCOMMAND>
+    graylog-to-grafana [OPTIONS] <input> --graylog-url <graylog_url> <SUBCOMMAND>
 
 FLAGS:
     -h, --help       Prints help information
     -V, --version    Prints version information
 
 OPTIONS:
-        --datasource <datasource>     [default: graylog]
+        --datasource <datasource>       [default: graylog]
+        --graylog-url <graylog_url>    Graylog url
 
 ARGS:
     <input>    Graylog content pack to process
@@ -28,7 +29,7 @@ ARGS:
 SUBCOMMANDS:
     add         Allows to add automatically dashboards to Grafana
     generate    Allows to save Grafana dashboards into a directory
-    help        Prints this message or the help of the given subcommand(s
+    help        Prints this message or the help of the given subcommand(s)
 ```
 
 ## How to use
@@ -40,14 +41,16 @@ Create a Graylog [content pack](https://docs.graylog.org/en/3.0/pages/content_pa
 ### Automatically import dashboards into Grafana
 
 ```cmd
-graylog-to-grafana dashboards.json add --token [bearer-token] --url [grafana-url] --folder [folder-id]
+graylog-to-grafana dashboards.json --graylog-url <graylog_url> add --token [bearer-token] --url [grafana-url] --folder [folder-id]
 ```
+The Argument `--graylog-url` is used for drilldown links.
 
 ### Just convert dashboard into Grafana Json
 
 ```cmd
-graylog-to-grafana dashboards.json generate dashboard
+graylog-to-grafana dashboards.json --graylog-url <graylog_url> generate dashboard
 ```
+The Argument `--graylog-url` is used for drilldown links.
 
 You can import these dashboard into grafana using the default user interface, see here [Import dashboards](https://grafana.com/docs/reference/export_import/).
 
