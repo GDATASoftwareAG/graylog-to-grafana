@@ -1,4 +1,5 @@
-use crate::{graylog, Opt};
+use crate::{graylog, ApplicationArguments};
+use log::warn;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -14,8 +15,19 @@ struct TimeRange {
     to: String,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ApiDashboard {
+    pub dashboard: Dashboard,
+    #[serde(rename = "folderId")]
+    pub folder_id: i64,
+    pub overwrite: bool,
+}
+
 impl Dashboard {
-    pub fn create_dashboard_from_graylog(dash: graylog::Dashboard, opt: &Opt) -> Dashboard {
+    pub fn create_dashboard_from_graylog(
+        dash: graylog::Dashboard,
+        opt: &ApplicationArguments,
+    ) -> Dashboard {
         Dashboard {
             title: dash.title,
             panels: dash
@@ -69,7 +81,7 @@ impl Panel {
         targets: Vec<PanelTarget>,
         renderer: graylog::ChartRenderer,
         grid_pos: GridPos,
-        opt: &Opt,
+        opt: &ApplicationArguments,
     ) -> Panel {
         Panel {
             title,
@@ -89,7 +101,10 @@ impl Panel {
         }
     }
 
-    pub fn create_panel(widget: graylog::DashboardWidget, opt: &Opt) -> Option<Panel> {
+    pub fn create_panel(
+        widget: graylog::DashboardWidget,
+        opt: &ApplicationArguments,
+    ) -> Option<Panel> {
         let grid_pos = GridPos::new_with_widget(&widget);
 
         let panel = match widget.r#type {
@@ -188,7 +203,11 @@ impl Panel {
                 }
             }
             graylog::DashboardWidgetType::QuickValuesHistogram => {
-                println!("Not Supported {:?}", &widget);
+                warn!(
+                    "Not Supported {:?} graph: {}",
+                    graylog::DashboardWidgetType::QuickValuesHistogram,
+                    widget.description
+                );
                 return None;
             }
         };
